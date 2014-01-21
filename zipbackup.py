@@ -6,7 +6,7 @@ class RedirectText(object):
     def write(self,string):
         wx.CallAfter(self.out.WriteText, string)
 
-class FileOps():         
+class FileOps(wx.Frame):         
     def make_zipfile(self, output_filename, source_dir):
         relroot = os.path.abspath(os.path.join(source_dir, os.pardir))
         with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zip:
@@ -22,8 +22,9 @@ class FileOps():
                         if output_filename not in filename:
                             zip.write(filename, arcname)
                             
-    def archiveMove(self, src, dst):
+    def run(self, src, dst):
         filename = time.strftime("%Y%m%d") + '_backup.zip'
+        print "Zip file: ", filename
         if not os.path.exists(os.path.join(dst, filename)):
             try:
                 # dont bother making the archive if it exists in the folder already
@@ -31,17 +32,19 @@ class FileOps():
                     self.make_zipfile(filename, src)
             except:
                 print "Error archiving"
+            try:
                 print "Moving archive to: ", dst
                 # shutil.move(filename, dst)
                 self.copyFile(os.path.abspath(filename), dst+filename)
-                try:
-                    print "Removing temp file: ", filename
-                    os.remove(filename)
-                except:
-                    print "Error deleting temp file"
+            except IOError as e:
+                print "Error: ", e
+            try:
+                print "Removing temp file: ", filename
+                os.remove(filename)
+            except IOError as e:
+                print "Error deleting temp file", e
         else:
             print "Backup already exists for today"
-        print "Done"
 
     # http://www.daniweb.com/software-development/python/threads/178615/large-shutil-copies-are-slow
     def copyFile(self, old, new):
@@ -91,13 +94,15 @@ class MyFrame(wx.Frame):
         panel = wx.Panel(self, wx.ID_ANY)
         log = wx.TextCtrl(panel,
                           wx.ID_ANY,
-                          size=(300,100),
+                          size=(300,600),
                           style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(log, 1, wx.ALL | wx.EXPAND, 5)
         panel.SetSizer(sizer)
         redir = RedirectText(log)
-        sys.stdout=redir
+        sys.stdout = redir
+        fops       = FileOps(self)
+        fops.run(sys.argv[1], sys.argv[2])
     
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -107,9 +112,9 @@ if __name__ == '__main__':
             if not os.path.exists(sys.argv[2]):
                 print "Creating directory: {0}".format(sys.argv[2])
                 os.mkdir(sys.argv[2])
+        else:
+            print "Source Directory doesn't exist"
 
-            app = wx.App()
-            frame = MyFrame().Show()
-            app.MainLoop()
-            fops = FileOps()
-            fops.archiveMove(sys.argv[1], sys.argv[2])
+        app = wx.App()
+        frame = MyFrame().Show()
+        app.MainLoop()

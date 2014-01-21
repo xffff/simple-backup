@@ -4,7 +4,7 @@ class RedirectText(object):
     def __init__(self,aWxTextCtrl):
         self.out=aWxTextCtrl
     def write(self,string):
-        wx.CallAfter(self.out.WriteText, string)
+        self.out.WriteText(string)
 
 class MyFrame(wx.Frame):
     zipfilename = None
@@ -34,8 +34,8 @@ class MyFrame(wx.Frame):
         self.zipfilename = time.strftime("%Y%m%d") + '_backup.zip'
         print "Zip file: ", self.zipfilename
         
-        self.makeZipfile(sys.argv[1])
-        self.copyFile(sys.argv[2])
+        wx.CallAfter(self.makeZipfile, sys.argv[1])
+        wx.CallAfter(self.copyFile, sys.argv[2])
     
     def makeZipfile(self, source_dir):
         print "Archiving"
@@ -50,12 +50,11 @@ class MyFrame(wx.Frame):
                     filename = os.path.join(root, file)
                     if os.path.isfile(filename): # regular files only
                         arcname = os.path.join(os.path.relpath(root, relroot), file)
-                        # print "Archiving:", filename
+                        print "Archiving:", filename
                         # don't try and archive yourself
                         if self.zipfilename not in filename:
                             zip.write(filename, arcname)
         print "Done archiving."
-        return True
                             
     def copyFile(self, dst):
         """ This function is a blind and fast copy operation.

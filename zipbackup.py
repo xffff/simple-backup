@@ -33,9 +33,11 @@ class FileOps(wx.Frame):
             except:
                 print "Error archiving"
             try:
-                print "Moving archive to: ", dst
+                print "Moving {0} to: ".format(os.path.abspath(filename),
+                                               os.path.join(dst,filename))
                 # shutil.move(filename, dst)
-                self.copyFile(os.path.abspath(filename), dst+filename)
+                self.copyFile(os.path.abspath(filename),
+                              os.path.join(dst,filename))
             except IOError as e:
                 print "Error: ", e
             try:
@@ -76,11 +78,13 @@ class FileOps(wx.Frame):
                 buf = fsrc.read(2**20)
                 if not buf:
                     break
-                    fdst.write(buf)
-                    count += len(buf)
-                    (keepGoing, skip) = dlg.Update(count, "Copied " + \
-                                                   str(count) + " bytes of " + str(max) + " bytes.")
-                    dlg.Destroy()
+                fdst.write(buf)
+                count += len(buf)
+                (keepGoing, skip) = dlg.Update(count, "Copied " + \
+                                               str(count) + " bytes of " + str(max) + " bytes.")
+            dlg.Destroy()
+        except:
+            print "Error in file move"
         finally:
             if fdst:
                 fdst.close()

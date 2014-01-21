@@ -1,4 +1,4 @@
-import os, time, shutil, sys, zipfile, wx
+import os, time, shutil, sys, zipfile, wx, threading
 
 class RedirectText(object):
     def __init__(self,aWxTextCtrl):
@@ -6,10 +6,22 @@ class RedirectText(object):
     def write(self,string):
         wx.CallAfter(self.out.WriteText, string)
 
-class FileOps(wx.Frame):         
-    def make_zipfile(self, output_filename, source_dir):
+class FileOps():
+    zipfilename = None
+    frame = None
+    
+    def __init__(self, frame):
+        self.zipfilename = time.strftime("%Y%m%d") + '_backup.zip'
+        print "Zip file: ", self.zipfilename
+
+        self.frame = frame
+    
+    def makeZipfile(self, source_dir):
+        print "Archiving"
+        if os.path.exists(self.zipfilename):
+            print "Archive already exists in local folder, overwriting: ", self.zipfilename
         relroot = os.path.abspath(os.path.join(source_dir, os.pardir))
-        with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zip:
+        with zipfile.ZipFile(self.zipfilename, "w", zipfile.ZIP_DEFLATED) as zip:
             for root, dirs, files in os.walk(source_dir):
                 # add directory (needed for empty dirs)
                 zip.write(root, os.path.relpath(root, relroot))
@@ -19,39 +31,42 @@ class FileOps(wx.Frame):
                         arcname = os.path.join(os.path.relpath(root, relroot), file)
                         print "Archiving:", filename
                         # don't try and archive yourself
-                        if output_filename not in filename:
+                        if self.zipfilename not in filename:
                             zip.write(filename, arcname)
+        print "Done archiving."
                             
-    def run(self, src, dst):
-        filename = time.strftime("%Y%m%d") + '_backup.zip'
-        print "Zip file: ", filename
-        if not os.path.exists(os.path.join(dst, filename)):
-            try:
-                # dont bother making the archive if it exists in the folder already
-                if not os.path.exists(filename):
-                    self.make_zipfile(filename, src)
-            except:
-                print "Error archiving"
-            try:
-                print "Moving {0} to: ".format(os.path.abspath(filename),
-                                               os.path.join(dst,filename))
-                # shutil.move(filename, dst)
-                self.copyFile(os.path.abspath(filename),
-                              os.path.join(dst,filename))
-            except IOError as e:
-                print "Error: ", e
-            try:
-                print "Removing temp file: ", filename
-                os.remove(filename)
-            except IOError as e:
-                print "Error deleting temp file", e
-        else:
-            print "Backup already exists for today"
+    # def run(self, src, dst):
+    #     filename = time.strftime("%Y%m%d") + '_backup.zip'
+
+    #     if not os.path.exists(os.path.join(dst, filename)):
+    #         try:
+    #             # dont bother making the archive if it exists in the folder already
+    #             if os.path.exists(filename):
+    #                print "Archive already exists in local folder: overwriting" 
+    #             self.make_zipfile(filename, src)
+    #             # try:
+    #             #     print "Moving {0} to: ".format(os.path.abspath(filename),
+    #             #                                    os.path.join(dst,filename))
+    #             #     self.copyFile(os.path.abspath(filename),
+    #             #                   os.path.join(dst,filename))
+    #             #     try:
+    #             #         print "Removing temp file: ", filename
+    #             #         os.remove(filename)
+    #             #     except IOError as e:
+    #             #         print "Error deleting temp file", e
+    #             # except IOError as e:
+    #             #     print "Error moving file: ", e
+    #         except IOError as e:
+    #             print "Error archiving: ", e
+    #     else:
+    #         print "Backup already exists for today"
 
     # http://www.daniweb.com/software-development/python/threads/178615/large-shutil-copies-are-slow
-    def copyFile(self, old, new):
+    def copyFile(self, dst):
         """ This function is a blind and fast copy operation.
               old and new are absolute file paths. """
+        old = os.path.abspath(self.zipfilename)
+        new = os.path.join(dst, self.zipfilename)
         fsrc = None
         fdst = None
         keepGoing = False
@@ -62,7 +77,7 @@ class FileOps(wx.Frame):
             dlg = wx.ProgressDialog("File Copy Progress",
                                     "Copied 0 bytes of " + str(max) + " bytes.",
                                     maximum = max,
-                                    parent  = self,
+                                    parent  = self.frame,
                                     style   = wx.PD_CAN_ABORT | \
                                     wx.PD_APP_MODAL | \
                                     wx.PD_ELAPSED_TIME | \
@@ -83,8 +98,8 @@ class FileOps(wx.Frame):
                 (keepGoing, skip) = dlg.Update(count, "Copied " + \
                                                str(count) + " bytes of " + str(max) + " bytes.")
             dlg.Destroy()
-        except:
-            print "Error in file move"
+        except Exception, e:
+            print "Error in file move:", e
         finally:
             if fdst:
                 fdst.close()
@@ -94,19 +109,21 @@ class FileOps(wx.Frame):
         
 class MyFrame(wx.Frame):
     def __init__(self):
-        wx.Frame.__init__(self, None, title="Backup")
+        wx.Frame.__init__(self, None, title="Backup", size=(800,300))
         panel = wx.Panel(self, wx.ID_ANY)
         log = wx.TextCtrl(panel,
                           wx.ID_ANY,
-                          size=(300,600),
+                          size=(800,300),
                           style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL)
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(log, 1, wx.ALL | wx.EXPAND, 5)
         panel.SetSizer(sizer)
-        redir = RedirectText(log)
-        sys.stdout = redir
-        fops       = FileOps(self)
-        fops.run(sys.argv[1], sys.argv[2])
+
+        # all text should go to the wxFrame        
+        sys.stdout = RedirectText(log)
+        fops = FileOps(self)
+        fops.makeZipfile(sys.argv[1])
+        fops.copyFile(sys.argv[2])
     
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -119,6 +136,6 @@ if __name__ == '__main__':
         else:
             print "Source Directory doesn't exist"
 
-        app = wx.App()
+        app = wx.App(False)
         frame = MyFrame().Show()
-        app.MainLoop()
+        app.MainLoop()    

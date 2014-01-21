@@ -81,11 +81,11 @@ class MyFrame(wx.Frame):
             count = 0
             #
             while keepGoing:
-                # Read blocks of size 2**20 = 1048576
+                # Read blocks of size 2**24
                 # Depending on system may require smaller
                 #  or could go larger... 
                 #  check your fs's max buffer size
-                buf = fsrc.read(2**20)
+                buf = fsrc.read(2**24)
                 if not buf:
                     break
                 fdst.write(buf)

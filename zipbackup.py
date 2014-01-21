@@ -36,6 +36,7 @@ class MyFrame(wx.Frame):
         
         wx.CallAfter(self.makeZipfile, sys.argv[1])
         wx.CallAfter(self.copyFile, sys.argv[2])
+        os.file.remove(self.zipfilename)
         
     def makeZipfile(self, source_dir):
         print "Archiving"
@@ -98,8 +99,8 @@ class MyFrame(wx.Frame):
             if fdst:
                 fdst.close()
             if fsrc:
-                fsrc.close()                        
-        return keepGoing
+                fsrc.close()
+        print "Done moving files"
     
 if __name__ == '__main__':
     if len(sys.argv) < 2:

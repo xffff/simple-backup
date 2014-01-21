@@ -28,15 +28,15 @@ class MyFrame(wx.Frame):
             if not os.path.exists(sys.argv[2]):
                 print "Creating directory: {0}".format(sys.argv[2])
                 os.mkdir(sys.argv[2])
-            else:
-                print "Source Directory doesn't exist"
+        else:
+            print "Source Directory doesn't exist"
                 
         self.zipfilename = time.strftime("%Y%m%d") + '_backup.zip'
         print "Zip file: ", self.zipfilename
         
         wx.CallAfter(self.makeZipfile, sys.argv[1])
         wx.CallAfter(self.copyFile, sys.argv[2])
-    
+        
     def makeZipfile(self, source_dir):
         print "Archiving"
         if os.path.exists(self.zipfilename):

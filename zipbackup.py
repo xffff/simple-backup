@@ -56,7 +56,8 @@ class MyFrame(wx.Frame):
                         if self.zipfilename not in filename:
                             zip.write(filename, arcname)
         print "Done archiving."
-                            
+
+    # http://www.daniweb.com/software-development/python/threads/178615/large-shutil-copies-are-slow
     def copyFile(self, dst):
         """ This function is a blind and fast copy operation.
               old and new are absolute file paths. """

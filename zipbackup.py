@@ -36,7 +36,6 @@ class MyFrame(wx.Frame):
         
         wx.CallAfter(self.makeZipfile, sys.argv[1])
         wx.CallAfter(self.copyFile, sys.argv[2])
-        os.file.remove(self.zipfilename)
         
     def makeZipfile(self, source_dir):
         print "Archiving"

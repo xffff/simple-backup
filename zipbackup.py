@@ -192,7 +192,7 @@ class MainFrame(wx.Frame):
             print "Weird ouput: ", event.data
             self.worker = None
 
-    def cleanup():
+    def cleanup(self):
         try:
             print "Deleting: ", self._zipfilename
             os.remove(self._zipfilename)

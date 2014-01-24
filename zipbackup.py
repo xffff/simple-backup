@@ -2,8 +2,6 @@ import os, time, shutil, sys, zipfile, wx
 from threading import *
 
 EVT_RESULT_ID = wx.NewId()
-ID_START = wx.NewId()
-ID_STOP = wx.NewId()
 
 def EVT_RESULT(win, func):
     win.Connect(-1, -1, EVT_RESULT_ID, func)
@@ -37,7 +35,6 @@ class ZipWorker(Thread):
         self._want_abort = 1
         
     def makeZipfile(self):
-        print "Archiving"
         if os.path.exists(self._zipfilename):
             print "Archive already exists in local folder, overwriting: ", self._zipfilename
         relroot = os.path.abspath(os.path.join(self._source_dir, os.pardir))
@@ -49,22 +46,23 @@ class ZipWorker(Thread):
                     filename = os.path.join(root, file)
                     if os.path.isfile(filename): # regular files only
                         arcname = os.path.join(os.path.relpath(root, relroot), file)
-                        print "Archiving: {0}", filename
+                        print "Archiving:", filename
                         # don't try and archive yourself
                         if self._zipfilename not in filename:
                             zip.write(filename, arcname)
                     if self._want_abort:
-                        wx.PostEvent(self._notify, ResultEvent(False))
+                        wx.PostEvent(self._notify, ResultEvent(None))
                         return
-        wx.PostEvent(self._notify, ResultEvent(True))
+        wx.PostEvent(self._notify, ResultEvent(1))
 
 class CopyWorker(Thread):
-    def __init__(self, notify, zipfilename, dst_dir):
+    def __init__(self, notify, frame, zipfilename, dst_dir):
         Thread.__init__(self)
         self._notify = notify
         self._want_abort = 0
         self._dst_dir = dst_dir
         self._zipfilename = zipfilename
+        self._frame = frame
         self.start()
         
     def run(self):
@@ -86,7 +84,8 @@ class CopyWorker(Thread):
             dlg = wx.ProgressDialog("File Copy Progress",
                                     "Copied 0 bytes of " + str(max) + " bytes.",
                                     maximum = max,
-                                    parent  = self,
+                                    # parent  = self,
+                                    parent = self._frame,
                                     style   = wx.PD_CAN_ABORT | \
                                     wx.PD_APP_MODAL | \
                                     wx.PD_ELAPSED_TIME | \
@@ -104,22 +103,24 @@ class CopyWorker(Thread):
                     break
                 fdst.write(buf)
                 count += len(buf)
-                (keepGoing, skip) = dlg.Update(count, "Copied " + \
-                                               str(count) + " bytes of " + str(max) + " bytes.")
+                (keepGoing, skip) = dlg.Update(count, "Copied " + str(count) + \
+                                               " bytes of " + str(max) + " bytes.")
             dlg.Destroy()
         except Exception, e:
             print "Error in file move:", e
+            wx.PostEvent(self._notify, ResultEvent(None))
+            return
         finally:
             if fdst:
                 fdst.close()
             if fsrc:
                 fsrc.close()
         print "Done moving files"
+        wx.PostEvent(self._notify, ResultEvent(2))
         
 class MainFrame(wx.Frame):
-
     def __init__(self, parent, id):
-        wx.Frame.__init__(self, None, title="Backup", size=(800,300))
+        self._frame = wx.Frame.__init__(self, None, title="Backup", size=(800,300))
         panel = wx.Panel(self, wx.ID_ANY)
 
         # # abort abort abort
@@ -162,30 +163,41 @@ class MainFrame(wx.Frame):
         print "Zip file: ", self._zipfilename
 
         # start zipping immediately
-        self.startZip(ID_START)
+        self.startZip()
         
-    def startZip(self, event):
+    def startZip(self):
         if not self.worker:
             self.worker = ZipWorker(self, self._zipfilename, self._src_dir)
 
-    def startCopy(self, event):
+    def startCopy(self):
         if not self.worker:
-            self.worker = ZipWorker(self, self._zipfilename, self._dst_dir)
-
-    def startCopy(self, event):
-        if not self.worker:
-            pass # todo
+            self.worker = CopyWorker(self, self._frame, self._zipfilename, self._dst_dir)
 
     def stopWorker(self, event):
         if self.worker:
             self.worker.abort()
 
     def onResult(self, event):
-        if event.data is None or event.data is False:
+        if event.data is None:
             print "Computation failed"
+        elif event.data == 1:
+            print "Archiving Finished!"
+            self.worker = None
+            self.startCopy()
+        elif event.data == 2:
+            self.worker = None
+            print "Copying Finished!"
+            self.cleanup()
         else:
-            print "Thread Finished!"
-        self.worker = None
+            print "Weird ouput: ", event.data
+            self.worker = None
+
+    def cleanup():
+        try:
+            print "Deleting: ", self._zipfilename
+            os.remove(self._zipfilename)
+        except Exception, e:
+            print "Error deleting local zipfile: ", e
 
     # http://www.daniweb.com/software-development/python/threads/178615/large-shutil-copies-are-slow
     def copyFile(self, dst):

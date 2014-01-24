@@ -199,52 +199,6 @@ class MainFrame(wx.Frame):
         except Exception, e:
             print "Error deleting local zipfile: ", e
 
-    # http://www.daniweb.com/software-development/python/threads/178615/large-shutil-copies-are-slow
-    def copyFile(self, dst):
-        """ This function is a blind and fast copy operation.
-              old and new are absolute file paths. """
-        old = os.path.abspath(self.zipfilename)
-        new = os.path.join(dst, self.zipfilename)
-        fsrc = None
-        fdst = None
-        keepGoing = False
-        max = os.stat(old).st_size
-        try:
-            fsrc = open(old, 'rb')
-            fdst = open(new, 'wb')
-            dlg = wx.ProgressDialog("File Copy Progress",
-                                    "Copied 0 bytes of " + str(max) + " bytes.",
-                                    maximum = max,
-                                    parent  = self,
-                                    style   = wx.PD_CAN_ABORT | \
-                                    wx.PD_APP_MODAL | \
-                                    wx.PD_ELAPSED_TIME | \
-                                    wx.PD_REMAINING_TIME)
-            keepGoing = True
-            count = 0
-            #
-            while keepGoing:
-                # Read blocks of size 2**24
-                # Depending on system may require smaller
-                #  or could go larger... 
-                #  check your fs's max buffer size
-                buf = fsrc.read(2**24)
-                if not buf:
-                    break
-                fdst.write(buf)
-                count += len(buf)
-                (keepGoing, skip) = dlg.Update(count, "Copied " + \
-                                               str(count) + " bytes of " + str(max) + " bytes.")
-            dlg.Destroy()
-        except Exception, e:
-            print "Error in file move:", e
-        finally:
-            if fdst:
-                fdst.close()
-            if fsrc:
-                fsrc.close()
-        print "Done moving files"
-
 class MainApp(wx.App):
     def OnInit(self):
         self.frame = MainFrame(None, -1)

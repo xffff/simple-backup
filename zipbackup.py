@@ -1,11 +1,60 @@
 import os, time, shutil, sys, zipfile, wx, threading
 
+EVT_RESULT_ID = wx.NewId()
+
+def EVT_RESULT(win, func):
+    win.Connect(-1, -1, EVT_RESULT_ID, func)
+
+class ResultEvent(wx.PyEvent):
+    def __init__(self, data):
+        wx.PyEvent.__init__(self)
+        self.SetEventType(EVT_RESULT_ID)
+        self.data = data
+
 class RedirectText(object):
     def __init__(self,aWxTextCtrl):
         self.out=aWxTextCtrl
     def write(self,string):
-        self.out.WriteText(string)
+        wx.CallAfter(self.out.WriteText, string)
 
+class ZipWorker(Thread):
+    def __init__(self, notify, zipfilename, source_dir):
+        Thread.__init__(self)
+        self._notify      = notify
+        self._want_abort  = 0
+        self._source_dir  = source_dir
+        self._zipfilename = zipfilename
+        # start on creation of thread
+        self.start()
+
+    def run(self):
+        self.makeZipfile()
+
+    def abort(self):
+        self._want_abort = 1
+        
+    def makeZipfile(self):
+        print "Archiving"
+        if os.path.exists(self._zipfilename):
+            print "Archive already exists in local folder, overwriting: ", self._zipfilename
+            relroot = os.path.abspath(os.path.join(self._source_dir, os.pardir))
+            with zipfile.ZipFile(self._zipfilename, "w", zipfile.ZIP_DEFLATED) as zip:
+                for root, dirs, files in os.walk(self._source_dir):
+                    # add directory (needed for empty dirs)
+                    zip.write(root, os.path.relpath(root, relroot))
+                    for file in files:
+                        filename = os.path.join(root, file)
+                        if os.path.isfile(filename): # regular files only
+                            arcname = os.path.join(os.path.relpath(root, relroot), file)
+                            print "Archiving:", filename
+                            # don't try and archive yourself
+                            if self._zipfilename not in filename:
+                                zip.write(filename, arcname)
+                        if self._want_abort:
+                            wx.PostEvent(self._notify_window, ResultEvent(False))
+                            return
+            wx.PostEvent(self._notify_window, ResultEvent(True))
+                            
 class MyFrame(wx.Frame):
     zipfilename = None
 
@@ -34,7 +83,7 @@ class MyFrame(wx.Frame):
         self.zipfilename = time.strftime("%Y%m%d") + '_backup.zip'
         print "Zip file: ", self.zipfilename
         
-        wx.CallAfter(self.makeZipfile, sys.argv[1])
+        self.Bind(EVT_DONE, wx.FutureCall(0, self.makeZipfile, sys.argv[1]))
         wx.CallAfter(self.copyFile, sys.argv[2])
         
     def makeZipfile(self, source_dir):
